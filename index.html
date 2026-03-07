@@ -7,19 +7,7 @@
     <title>Pexeso pro babi</title>
     <link rel="stylesheet" href="styles.css" />
 
-    <!-- 🔒 Heslová ochrana -->
-    <script>
-      (function () {
-        var REQUIRED = "tetaHana2026"; // ← změň podle potřeby
-        var input = sessionStorage.getItem("babi_access") || prompt("Zadej heslo:");
-        if (input !== REQUIRED) {
-          alert("Špatné heslo.");
-          window.location.href = "https://www.google.com";
-        } else {
-          sessionStorage.setItem("babi_access", REQUIRED);
-        }
-      })();
-    </script>
+    
 </head>
 
 <body>
@@ -52,3 +40,4 @@
     <script src="app.js" defer></script>
 </body>
 </html>
+

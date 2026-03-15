@@ -1,5 +1,5 @@
 // ===== Konfigurace fotek =====
-const PHOTO_EXTS = [".jpg", ".png"];        // povolené přípony pro páry
+const PHOTO_EXTS = [".png", ".jpg"];        // povolené přípony pro páry
 const PHOTO_DIR  = "img";                   // složka s obrázky
 const MAX_AVAILABLE = 24;                   // img1..imgN dle přípravy
 

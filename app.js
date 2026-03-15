@@ -1,7 +1,7 @@
 // ===== Konfigurace fotek =====
-const PHOTO_EXT = ".jpg";        // máš-li .png nebo .webp, změň zde
-const PHOTO_DIR = "img";
-const MAX_AVAILABLE = 24;        // kolik max. fotek máš připravených (img1..imgN)
+const PHOTO_EXTS = [".png", ".jpg"];        // povolené přípony pro páry
+const PHOTO_DIR  = "img";                   // složka s obrázky
+const MAX_AVAILABLE = 24;                   // img1..imgN dle přípravy
 
 // ===== DOM =====
 const boardEl    = document.getElementById("board");
@@ -36,16 +36,45 @@ const formatTime = (ms) => {
   return `${m}:${r.toString().padStart(2, "0")}`;
 };
 
-function buildPhotoPool(count) {
+// === Ověření existence obrázku (HEAD-like přes <img>) ===
+function testImage(src, timeout = 5000) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const t = setTimeout(() => {
+      img.src = "";
+      resolve(false);
+    }, timeout);
+    img.onload = () => { clearTimeout(t); resolve(true); };
+    img.onerror = () => { clearTimeout(t); resolve(false); };
+    // cache-bust, ať se projeví změny i na statickém hostingu
+    img.src = src + (src.includes("?") ? "&" : "?") + "v=" + Date.now();
+  });
+}
+
+// === Pro index i najdi první existující příponu ===
+async function resolveSrcForIndex(i) {
+  for (const ext of PHOTO_EXTS) {
+    const candidate = `${PHOTO_DIR}/img${i}${ext}`;
+    if (await testImage(candidate)) return candidate;
+  }
+  return null;
+}
+
+// === Sestav seznam unikátních fotek pro požadovaný počet párů ===
+async function buildPhotoPoolAsync(count) {
   const limit = Math.min(count, MAX_AVAILABLE);
-  return Array.from({ length: limit }, (_, i) => `${PHOTO_DIR}/img${i + 1}${PHOTO_EXT}`);
+  const out = [];
+  for (let i = 1; i <= limit; i++) {
+    const src = await resolveSrcForIndex(i);
+    if (src) out.push(src);
+  }
+  return out;
 }
 
 // ===== Adaptivní výpočet velikosti karet =====
 function updateCellSize() {
   const rows = size;
   const cols = size;
-
   const vw = window.innerWidth;
   const vh = window.innerHeight;
 
@@ -54,28 +83,26 @@ function updateCellSize() {
   const topbarHeight = topbar ? topbar.getBoundingClientRect().height : 140;
   const footerHeight = footer ? footer.getBoundingClientRect().height : 20;
 
-  const verticalFree = vh - (topbarHeight + footerHeight + 32);  // buffer
-  const containerMax = 980;                                      // šířka .container
-  const horizontalFree = Math.min(vw, containerMax) - 32;        // levý+pravý padding
+  const verticalFree = vh - (topbarHeight + footerHeight + 32); // buffer
+  const containerMax = 980; // šířka .container
+  const horizontalFree = Math.min(vw, containerMax) - 32; // padding L/R
 
-  const rootStyles = getComputedStyle(document.documentElement);
-  const gapPx = parseInt(rootStyles.getPropertyValue("--gap")) || 8;
+  const root = getComputedStyle(document.documentElement);
+  const gapPx = parseInt(root.getPropertyValue("--gap")) || 8;
 
-  const cellByHeight = Math.floor((verticalFree - gapPx * (rows - 1)) / rows);
-  const cellByWidth  = Math.floor((horizontalFree - gapPx * (cols - 1)) / cols);
-
-  const cell = Math.max(60, Math.min(cellByHeight, cellByWidth, 200));
-
+  const cellByH = Math.floor((verticalFree - gapPx * (rows - 1)) / rows);
+  const cellByW = Math.floor((horizontalFree - gapPx * (cols - 1)) / cols);
+  const cell = Math.max(60, Math.min(cellByH, cellByW, 200));
   document.documentElement.style.setProperty("--cell-size", cell + "px");
 }
-
 window.addEventListener("resize", updateCellSize);
 
 // ===== Generování balíčku =====
-function buildDeck(n) {
+async function buildDeck(n) {
   const pairs = (n * n) / 2;
-  const pool = buildPhotoPool(pairs);
-  return shuffle([...pool, ...pool]).map((src, idx) => ({
+  const pool = await buildPhotoPoolAsync(pairs);
+  const usable = pool.slice(0, pairs); // pojistka: když je fotek méně
+  return shuffle([...usable, ...usable]).map((src, idx) => ({
     id: idx + "_" + src,
     src,
     matched: false
@@ -94,10 +121,13 @@ function renderBoard() {
     cardEl.setAttribute("aria-label", "karta");
     cardEl.dataset.id = card.id;
 
-    // 🔧 OPRAVA: vložíme skutečný IMG, ne jen text cesty
+    // Front = společný motiv (zadní strana pexesa)
+    // Back  = konkrétní fotka páru
     cardEl.innerHTML = `
       <div class="card-inner">
-        <div class="face front"></div>
+        <div class="face front">
+          <img class="front-logo" src="${PHOTO_DIR}/zadni-motiv.png" alt="" loading="lazy" />
+        </div>
         <div class="face back">
           <img src="${card.src}" alt="" loading="lazy" />
         </div>
@@ -118,14 +148,13 @@ function startTimer() {
     timeEl.textContent = formatTime(Date.now() - startTime);
   }, 250);
 }
-
 function stopTimer() {
   clearInterval(timerId);
   timerId = null;
 }
 
 // ===== Herní logika =====
-function resetGame() {
+async function resetGame() {
   stopTimer();
   moves = 0; movesEl.textContent = "0";
   timeEl.textContent = "0:00";
@@ -133,9 +162,8 @@ function resetGame() {
   lock = false;
   matchedPairs = 0;
 
-  deck = buildDeck(size);
+  deck = await buildDeck(size);
   renderBoard();
-
   setTimeout(startTimer, 150);
 }
 
@@ -145,7 +173,6 @@ function onFlip(e) {
   if (cardButton.classList.contains("flipped")) return;
 
   cardButton.classList.add("flipped");
-
   if (!first) { first = cardButton; return; }
   if (first === cardButton) return;
 
@@ -154,7 +181,6 @@ function onFlip(e) {
   evaluatePair();
 }
 
-// 🔧 OPRAVA: čteme src z IMG
 function getSymbol(btn) {
   const img = btn.querySelector(".back img");
   return img ? img.getAttribute("src") : "";
@@ -194,9 +220,10 @@ function evaluatePair() {
 // ===== UI =====
 sizeSel.addEventListener("change", () => {
   size = parseInt(sizeSel.value, 10);
-  resetGame();
+  void resetGame();
 });
-restartBtn.addEventListener("click", resetGame);
+restartBtn.addEventListener("click", () => void resetGame());
 
 // ===== Start =====
-resetGame();
+void resetGame();
+``

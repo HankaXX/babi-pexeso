@@ -5,7 +5,6 @@
   --text: #e2e8f0;
   --accent: #22c55e;
   --danger: #ef4444;
-
   /* Adaptivní velikost buněk – dopočítá JS */
   --cell-size: 120px;
   --gap: 8px;
@@ -21,6 +20,7 @@ body {
 }
 
 .container { max-width: 980px; margin: 32px auto; padding: 0 16px; }
+
 .topbar {
   display: grid;
   grid-template-columns: 1fr auto auto;
@@ -31,6 +31,7 @@ body {
 .topbar h1 { margin: 0; font-size: 1.6rem; letter-spacing: .5px; }
 .stats { display: flex; gap: 16px; font-variant-numeric: tabular-nums; }
 .actions { display: flex; gap: 8px; align-items: center; }
+
 select, button {
   background: var(--card);
   color: var(--text);
@@ -47,12 +48,11 @@ button:hover { filter: brightness(1.1); }
   margin: 8px 0 16px;
   justify-content: center;
 }
-
 /* Sloupce podle zvolené velikosti */
 .board.cols-4 { grid-template-columns: repeat(4, var(--cell-size)); }
 .board.cols-6 { grid-template-columns: repeat(6, var(--cell-size)); }
 
-/* Karty jsou čtverce podle --cell-size (žádný padding-top hack) */
+/* Karty jsou čtverce podle --cell-size */
 .card {
   position: relative;
   width: var(--cell-size);
@@ -67,14 +67,30 @@ button:hover { filter: brightness(1.1); }
   border-radius: inherit;
 }
 .card.flipped .card-inner { transform: rotateY(180deg); }
+
 .face {
   position: absolute; inset: 0;
   display: grid; place-items: center;
   backface-visibility: hidden;
   border-radius: inherit;
 }
-.front { background: var(--card); }
-.back  {
+
+/* Přední strana = společný motiv */
+.front {
+  background: var(--card);
+  overflow: hidden;
+}
+.front .front-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;      /* vyplní čtverec bez deformace */
+  opacity: 0.95;          /* případně 1.0 dle preferencí */
+  border-radius: inherit;
+  display: block;
+}
+
+/* Zadní strana = konkrétní fotka páru */
+.back {
   background: linear-gradient(145deg, var(--card-face), #0284c7);
   transform: rotateY(180deg);
   overflow: hidden;
